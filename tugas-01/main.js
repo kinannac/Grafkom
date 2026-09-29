@@ -214,31 +214,47 @@ function createCircleVertices(cx, cy, radius, segments = 30) {
   return vertices;
 }
 
-function createBezierCurve(p0x, p0y, p1x, p1y, p2x, p2y, segments = 15) {
+function drawBushRow(baseY, radius, color, offset) { 
+  for (let x = -1.0; x <= 1.0 + radius; x += radius * 1.0) { 
+    const bump = Math.sin((x + offset) * 18.0) * 0.04; 
+    drawShape(createCircleVertices(x, baseY + bump, radius, 20), color, gl.TRIANGLE_FAN); 
+  }
+} 
+
+function drawBird(posX, posY, scale, seconds, speed = 6.0) {
+  const flap = Math.sin(seconds * speed) * (0.02 * scale);
+
   const points = [];
-    for (let i = 0; i <= segments; i++) {
-      const t = i / segments;
-      const x = (1 - t) * (1 - t) * p0x + 2 * (1 - t) * t * p1x + t * t * p2x;
-      const y = (1 - t) * (1 - t) * p0y + 2 * (1 - t) * t * p1y + t * t * p2y;
-      points.push(x, y);
-    }
-  return new Float32Array(points);
+  const segments = 30;
+  const wingWidth = 0.15 * scale;
+
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    const x = (t - 0.5) * (2 * wingWidth); 
+    const y = Math.abs(Math.sin(t * Math.PI * 2)) * ((0.05 * scale) + flap);
+    
+    points.push(x, y);
+  }
+
+  const birdMatrix = Mat3.translation(posX, posY);
+  gl.uniformMatrix3fv(matrixLocation, false, birdMatrix);
+  drawShape(new Float32Array(points), [0.0, 0.0, 0.0, 1.0], gl.LINE_STRIP);
 }
 
 function drawScene(seconds) {
-  // Clear canvas
-  gl.clearColor(0.53, 0.81, 0.98, 1.0); // Warna langit
-  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.clearColor(0.53, 0.81, 0.98, 1.0); 
+  gl.clear(gl.COLOR_BUFFER_BIT); 
 
-  // ==========================================
-  // 1. GAMBAR OBJEK STATIS (Latar Belakang, Gunung, Laut, Pohon, Rumah)
-  // ==========================================
-  gl.uniformMatrix3fv(matrixLocation, false, Mat3.identity());
+  gl.uniformMatrix3fv(matrixLocation, false, Mat3.identity()); 
 
-  drawShape([
-    -1.0, 0.0, 0.0, 0.0, -0.5, 0.8,
-    0.0, 0.0, 1.0, 0.0, 0.5, 0.5
-  ], [0.2, 0.3, 0.2, 1.0]);
+  // gunung
+  drawShape([ 
+    -1.0, 0.0, 0.3, 0.0, -0.35, 0.6, 
+    -0.2, 0.0, 1.0, 0.0, 0.4, 0.6 
+  ], [0.2, 0.3, 0.2, 1.0]); 
+
+  // semak-semak 
+  drawBushRow(0.03, 0.08, [0.45, 0.80, 0.20, 1.0], 1.3); 
 
   // laut
   drawShape([
@@ -293,27 +309,6 @@ function drawScene(seconds) {
     0.83, -0.35, 0.88, -0.4, 0.83, -0.4
   ], [1.0, 1.0, 1.0, 1.0]);
 
-  // pohon kelapa
-  drawShape([
-    -0.65, -0.1,  -0.7, -0.1,  -0.65, -0.7,
-    -0.7, -0.7,  -0.7, -0.1,  -0.65, -0.7
-  ], [0.4, 0.2, 0.1, 1.0]);
-
-  drawShape([
-    //daun1
-    -0.67, -0.1,  -0.5,  0.2,   -0.35,  0.15,
-    //daun2
-    -0.67, -0.1,  -0.4, -0.05,  -0.2, -0.2,
-    //daun3
-    -0.67, -0.1,  -0.35, -0.5, -0.55, -0.4,
-    //daun4
-    -0.67, -0.1,  -0.95, -0.35, -0.8, -0.35,
-    //daun5
-    -0.67, -0.1,  -0.98,  0.1,   -0.85, -0.1,
-    //daun6
-    -0.67, -0.1,  -0.8, 0.35, -0.65, 0.1
-  ], [0.0, 0.6, 0.2, 1.0]);
-
   // garis jendela
   const windowGridLines1 = new Float32Array([
     0.775, -0.35,   0.775, -0.4,
@@ -328,37 +323,26 @@ function drawScene(seconds) {
   drawShape(windowGridLines1, [0.1, 0.1, 0.1, 1.0], gl.LINES);
   drawShape(windowGridLines2, [0.1, 0.1, 0.1, 1.0], gl.LINES);
 
-  // burung
-  const leftWing = createBezierCurve(-0.2, 0.6,  -0.15, 0.68,  -0.1, 0.62);
-  const rightWing = createBezierCurve(-0.1, 0.62,  -0.05, 0.68,  0.0, 0.6);
+  // pohon kelapa
+  drawShape([
+    -0.65, -0.1,  -0.7, -0.1,  -0.65, -0.7,
+    -0.7, -0.7,  -0.7, -0.1,  -0.65, -0.7
+  ], [0.4, 0.2, 0.1, 1.0]);
 
-  drawShape(leftWing, [0.0, 0.0, 0.0, 1.0], gl.LINE_STRIP);
-  drawShape(rightWing, [0.0, 0.0, 0.0, 1.0], gl.LINE_STRIP);
- 
-  function updateBirdAnimation(seconds) {
-    // Puncak kepakan sayap bergerak naik-turun
-    const flap = Math.sin(seconds * 8.0) * 0.05;
+  drawShape([
+    -0.67, -0.1,  -0.5,  0.2,   -0.35,  0.15,
+    -0.67, -0.1,  -0.4, -0.05,  -0.2, -0.2,
+    -0.67, -0.1,  -0.35, -0.5, -0.55, -0.4,
+    -0.67, -0.1,  -0.95, -0.35, -0.8, -0.35,
+    -0.67, -0.1,  -0.98,  0.1,   -0.85, -0.1,
+    -0.67, -0.1,  -0.8, 0.35, -0.65, 0.1
+  ], [0.0, 0.6, 0.2, 1.0]);
 
-    const leftWingDynamic = createBezierCurve(
-      -0.2, 0.6,             // Titik Awal
-      -0.15, 0.68 + flap,    // Titik Puncak (di-animasikan!)
-      -0.1, 0.62             // Titik Tengah
-    );
-
-    const rightWingDynamic = createBezierCurve(
-      -0.1, 0.62,            // Titik Tengah
-      -0.05, 0.68 + flap,    // Titik Puncak (di-animasikan!)
-      0.0, 0.6               // Titik Akhir
-    );
-
-    drawShape(leftWingDynamic, [0.0, 0.0, 0.0, 1.0], gl.LINE_STRIP);
-    drawShape(rightWingDynamic, [0.0, 0.0, 0.0, 1.0], gl.LINE_STRIP);
-  }
-  
+  // matahari  
   const scale = 1.0 + Math.sin(seconds * 3.0) * 0.15;
 
-  const sunX = 0.8;
-  const sunY = 0.8;
+  const sunX = 0.0;
+  const sunY = 0.7;
 
   const scaleMatrix = Mat3.scaling(scale, scale);
   const translationMatrix = Mat3.translation(sunX, sunY);
@@ -368,9 +352,13 @@ function drawScene(seconds) {
   const sunVertices = createCircleVertices(0.0, 0.0, 0.2, 36);
   gl.uniformMatrix3fv(matrixLocation, false, sunMatrix);
   drawShape(sunVertices, [1.0, 0.95, 0.0, 1.0], gl.TRIANGLE_FAN);
+
+  // burung
+  const posX = -1.0 + ((seconds * 0.15) % 2.0);
+  const posY = 0.6 + Math.sin(seconds * 6.0) * 0.05;
+  drawBird(posX, posY, 1.0, seconds, 6.0);
 }
 
-// Render loop
 function render(time) {
   const seconds = time * 0.001;
   drawScene(seconds);
@@ -378,97 +366,3 @@ function render(time) {
 }
 
 requestAnimationFrame(render);
-
-/*
-gl.clearColor(0.05, 0.08, 0.15, 1.0);
-gl.clear(gl.COLOR_BUFFER_BIT);
-
-drawShape([
-  -1.0 , 1.0, -1.0, 0.0, 1.0, 1.0,
-  -1.0, 0.0, 1.0, 0.0, 1.0, 1.0
-], [0.6, 0.9, 1.0, 1.0]);
-
-drawShape([
-  -1.0, 0.0, 0.0, 0.0, -0.5, 0.8,
-  0.0, 0.0, 1.0, 0.0, 0.5, 0.5
-], [0.2, 0.3, 0.2, 1.0]);
-
-// laut
-drawShape([
-  -1.0,  0.0,  1.0,  0.0,  -1.0, -1.0,
-  -1.0, -1.0,  1.0,  0.0,   1.0, -1.0
-], [0.0, 0.3, 0.8, 1.0]);
-
-// pantai kanan
-drawShape([
-  0.3,  0.0,  1.5,  0.0,  0.1, -0.15,
-  0.1, -0.15, 0.3, -0.3,  1.5,  0.0,
-  0.3, -0.3,  1.5,  0.0,  0.1, -0.5,
-  0.1, -0.5,  0.6, -0.8,  1.5,  0.0,
-  0.3, -1.0,  1.5, 0.0,   1.0, -1.0,
-], [0.85, 0.65, 0.4, 1.0]);
-
-// pantai kiri
-drawShape([
-  -1.0, 0.0, -0.4, 0.0, -0.8, -0.4,
-  -1.0, -0.6, -0.4, -0.5, -1.0, 0.0,
-  -1.0, -0.6, -0.4, -0.5, -1.0, -0.4,
-  -1.0, -0.6, -0.6, -0.7, -0.4, -0.5,
-  -1.0, -0.6,  -0.6, -0.7,  -1.0, -1.0,
-  -1.0, -1.0,  -0.6, -0.7,  -0.2, -1.0
-], [0.85, 0.65, 0.4, 1.0]);
-
-// rumah
-drawShape([
-  0.6, -0.3,   0.9, -0.3,   0.6, -0.5,
-  0.6, -0.5,   0.9, -0.3,   0.9, -0.5
-], [0.9, 0.9, 0.9, 1.0]);
-
-// atap rumah
-drawShape([
-  0.55, -0.3,  0.95, -0.3,  0.75, -0.15
-], [0.8, 0.15, 0.15, 1.0]);
-
-// pintu
-drawShape([
-  0.65, -0.35, 0.7, -0.35, 0.7, -0.5,
-  0.65, -0.35, 0.65, -0.5, 0.7, -0.5
-], [0.0, 0.7, 0.8, 1.0]);
-
-// jendela
-drawShape([
-  0.75, -0.35, 0.8, -0.35, 0.8, -0.4,
-  0.75, -0.35, 0.8, -0.4, 0.75, -0.4
-], [1.0, 1.0, 1.0, 1.0]);
-
-drawShape([
-  0.83, -0.35, 0.88, -0.35, 0.88, -0.4,
-  0.83, -0.35, 0.88, -0.4, 0.83, -0.4
-], [1.0, 1.0, 1.0, 1.0]);
-
-// pohon kelapa
-drawShape([
-  -0.65, -0.1,  -0.7, -0.1,  -0.65, -0.7,
-  -0.7, -0.7,  -0.7, -0.1,  -0.65, -0.7
-], [0.4, 0.2, 0.1, 1.0]);
-
-drawShape([
-  //daun1
-  -0.67, -0.1,  -0.5,  0.2,   -0.35,  0.15,
-  //daun2
-  -0.67, -0.1,  -0.4, -0.05,  -0.2, -0.2,
-  //daun3
-  -0.67, -0.1,  -0.35, -0.5, -0.55, -0.4,
-  //daun4
-  -0.67, -0.1,  -0.95, -0.35, -0.8, -0.35,
-  //daun5
-  -0.67, -0.1,  -0.98,  0.1,   -0.85, -0.1,
-  //daun6
-  -0.67, -0.1,  -0.8, 0.35, -0.65, 0.1
-], [0.0, 0.6, 0.2, 1.0]);
-
-// matahari
-const sunVertices = createCircleVertices(0.9, 0.9, 0.2, 40);
-
-drawShape(sunVertices, [1.0, 0.9, 0.0, 1.0], gl.TRIANGLE_FAN);
-*/
